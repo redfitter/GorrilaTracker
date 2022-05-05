@@ -1,0 +1,3 @@
+[submodule "chimp-code"]
+	path = chimp-code
+	url = git@github.com:jpsheehan/chimp-code.git
