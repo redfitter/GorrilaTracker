@@ -2,12 +2,16 @@
 
 import numpy as np
 import cv2
+import imageio
+
 from filterpy.kalman import KalmanFilter, UnscentedKalmanFilter, MerweScaledSigmaPoints
 
 def difference():
 # Load the video file.
-    cap = cv2.VideoCapture('Videos/goingDown.mp4')
+    cap = cv2.VideoCapture("Videos/goingDown.mp4")
     # cap = cv2.VideoCapture(-1)
+
+    img_lst = []
 
     ret, img0 = cap.read()
     ret, img1 = cap.read()
@@ -21,7 +25,6 @@ def difference():
 
         diff = cv2.subtract(cv2.cvtColor(img0, cv2.COLOR_BGR2GRAY),
                                             cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY))
-
         # Move the data in img0 to img1. Uncomment this line for differencing from the first frame.
         img1 = img0
         ret, img0 = cap.read()  # Grab a new frame from the camera for img0.
@@ -30,19 +33,25 @@ def difference():
         diff = cv2.medianBlur(diff,5)
 
         kernel = np.ones((3,3), np.uint8)
-        opening = cv2.morphologyEx(diff, cv2.MORPH_OPEN, kernel, iterations=1)
+        opening = cv2.morphologyEx(diff, cv2.MORPH_OPEN, kernel, iterations=2)
 
         height = diff.shape[0]
+        
         moments = cv2.moments(opening)
+        frame = cv2.cvtColor(opening, cv2.COLOR_GRAY2RGB)
         if moments["m00"] != 0:  # Check for divide by zero errors.
             cX = int(moments["m10"] / moments["m00"])
             cY = int(moments["m01"] / moments["m00"])
-            print("X: {}, Y: {}".format(cX, height - cY))
-            cv2.circle(opening, (cX, cY), 20, (255, 255, 0), -1)
+            #print("X: {}, Y: {}".format(cX, height - cY))
+            cv2.circle(frame, (cX, cY), 20, (255, 0, 255), -1)
 
 
-        cv2.imshow('Difference', opening)  # Display the difference to the screen.
+        cv2.imshow('Difference', frame)  # Display the difference to the screen.
 
+        # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        dim = (640, 540)
+        resized = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
+        img_lst.append(resized)
         # Close the script if q is pressed.
         # Note that the delay in cv2.waitKey affects how quickly the video will play on screen.
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -50,6 +59,7 @@ def difference():
 
     # Release the video file, and close the GUI.
     cap.release()
+    imageio.mimsave('Videos/video1.gif', img_lst, fps=20)
     cv2.destroyAllWindows()
 
 def difference_with_kalman():
@@ -101,19 +111,29 @@ def difference_with_kalman():
         kernel = np.ones((3,3), np.uint8)
         opening = cv2.morphologyEx(diff, cv2.MORPH_OPEN, kernel, iterations=3)
 
-        kalman.predict()
-
         height = diff.shape[0]
         moments = cv2.moments(opening)
         if moments["m00"] != 0:  # Check for divide by zero errors.
             cX = int(moments["m10"] / moments["m00"])
             cY = int(moments["m01"] / moments["m00"])
-            center = np.array([int(x),int(y)])
+            center = np.array([int(cX),int(cY)])
             print("X: {}, Y: {}".format(cX, height - cY))
             cv2.circle(img0, (cX, cY), 20, (255, 255, 0), -1)
 
+            kalman.predict()
+            center_ = (int(kalman.x[0]), int(kalman.x[1]))
+            axis_lengths = (int(kalman.P_prior[0, 0]), int(kalman.P_prior[1, 1]))
+            cv2.ellipse(diff, center_, axis_lengths, 0, 0, 360, color=(255, 0, 0))
 
-        cv2.imshow('Difference', img0)  # Display the difference to the screen.
+            cv2.circle(diff, tuple(center), 1, (0,255,0), 2)  # Draw the center (not centroid!) of the ball.
+
+            measured = np.array([center[0], center[1]], dtype="float32")
+                # Update the Kalman filter with the current ball location if we have it.
+            kalman.update(measured)
+            print('Estimate:\t', np.int32(kalman.x))
+            print('Variance:\t', np.diag(kalman.P))
+
+        cv2.imshow('Difference', diff)  # Display the difference to the screen.
 
         # Close the script if q is pressed.
         # Note that the delay in cv2.waitKey affects how quickly the video will play on screen.
@@ -127,4 +147,4 @@ def difference_with_kalman():
 
 if __name__ == "__main__":
     difference()
-    # difference_with_kalman()
+    #difference_with_kalman()
