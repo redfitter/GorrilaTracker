@@ -2,65 +2,86 @@
 
 import numpy as np
 import cv2
-import imageio
 
 from filterpy.kalman import KalmanFilter, UnscentedKalmanFilter, MerweScaledSigmaPoints
 
 def difference():
 # Load the video file.
-    cap = cv2.VideoCapture("Videos/goingDown.mp4")
+    cap = cv2.VideoCapture("Videos/bagVid.mp4")
     # cap = cv2.VideoCapture(-1)
-
-    img_lst = []
+    count = 2
 
     ret, img0 = cap.read()
     ret, img1 = cap.read()
 
     while cap.isOpened():
-        ret, frame = cap.read()  # Read an frame from the video file.
 
         # If we cannot read any more frames from the video file, then exit.
         if not ret:
             break
 
-        diff = cv2.subtract(cv2.cvtColor(img0, cv2.COLOR_BGR2GRAY),
+        sub = cv2.subtract(cv2.cvtColor(img0, cv2.COLOR_BGR2GRAY),
                                             cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY))
         # Move the data in img0 to img1. Uncomment this line for differencing from the first frame.
         img1 = img0
         ret, img0 = cap.read()  # Grab a new frame from the camera for img0.
+        if not ret:
+            break
 
-        ret, diff = cv2.threshold(diff, 24, 255, cv2.THRESH_BINARY)
-        diff = cv2.medianBlur(diff,5)
+        ret, diff = cv2.threshold(sub, 24, 255, cv2.THRESH_BINARY)
+        blur = cv2.medianBlur(diff,5)
 
         kernel = np.ones((3,3), np.uint8)
-        opening = cv2.morphologyEx(diff, cv2.MORPH_OPEN, kernel, iterations=2)
+        opening = cv2.morphologyEx(blur, cv2.MORPH_OPEN, kernel, iterations=2)
 
         height = diff.shape[0]
-        
         moments = cv2.moments(opening)
-        frame = cv2.cvtColor(opening, cv2.COLOR_GRAY2RGB)
+
+        # sub = cv2.cvtColor(sub, cv2.COLOR_GRAY2BGR)
+        # diff = cv2.cvtColor(diff, cv2.COLOR_GRAY2BGR)
+        # blur = cv2.cvtColor(blur, cv2.COLOR_GRAY2BGR)
+        # opening = cv2.cvtColor(opening, cv2.COLOR_GRAY2BGR)
+        
+        
         if moments["m00"] != 0:  # Check for divide by zero errors.
             cX = int(moments["m10"] / moments["m00"])
             cY = int(moments["m01"] / moments["m00"])
-            #print("X: {}, Y: {}".format(cX, height - cY))
-            cv2.circle(frame, (cX, cY), 20, (255, 0, 255), -1)
+            # print("X: {}, Y: {}".format(cX, height - cY))
+            # cv2.circle(opening, (cX, cY), 20, (255, 0, 255), -1)
+            cv2.circle(img1, (cX, cY), 20, (255, 0, 255), -1)
+
+        
+        # cv2.imshow('Difference', sub)  # Display the difference to the screen.
 
 
-        cv2.imshow('Difference', frame)  # Display the difference to the screen.
 
-        # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        dim = (640, 540)
-        resized = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
-        img_lst.append(resized)
-        # Close the script if q is pressed.
+        # imgtop = np.concatenate((sub, diff), axis=1)
+        # imgtop = np.concatenate((imgtop, img0), axis=1)
+
+        # imgbot = np.concatenate((blur, opening), axis=1)
+        # imgbot = np.concatenate((imgbot, img1), axis=1)
+
+        # imgcat = np.concatenate((imgtop, imgbot), axis=0)
+
+        # scale_percent = 30 # percent of original size
+        # width = int(imgcat.shape[1] * scale_percent / 100)
+        # height = int(imgcat.shape[0] * scale_percent / 100)
+        # dim = (width, height)
+        
+        # resize image
+        # resized = cv2.resize(imgcat, dim, interpolation = cv2.INTER_AREA)
+
+        # cv2.imshow('Bluyr', imgcat)
+        count = count + 1
+        # Close the script if q is pressed.  cv2.waitKey(20)
         # Note that the delay in cv2.waitKey affects how quickly the video will play on screen.
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if 0xFF == ord('q'):
             break
 
     # Release the video file, and close the GUI.
     cap.release()
-    imageio.mimsave('Videos/video1.gif', img_lst, fps=20)
     cv2.destroyAllWindows()
+    print(count)
 
 def difference_with_kalman():
 # Load the video file.
